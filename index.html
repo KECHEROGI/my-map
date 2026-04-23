@@ -1,101 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>World Currency Map</title>
+    <title>Карта Валют</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; background: #1a1a1a; font-family: sans-serif; }
+        body { margin: 0; background: #222; font-family: sans-serif; }
         #map { height: 100vh; width: 100vw; }
-        .search { position: absolute; top: 20px; left: 50px; z-index: 1000; }
-        #cInput { padding: 10px; border-radius: 20px; border: none; width: 200px; }
-        .card { 
-            position: absolute; top: 20px; right: 20px; z-index: 1000; 
-            background: white; padding: 20px; border-radius: 15px; 
-            display: none; width: 250px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        .search { position: absolute; top: 15px; left: 50px; z-index: 1000; }
+        #cInput { padding: 10px; border-radius: 20px; width: 200px; border: none; }
+        #card { 
+            position: absolute; top: 15px; right: 15px; z-index: 1000; 
+            background: white; padding: 20px; border-radius: 12px; 
+            display: none; width: 240px; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
 <div class="search">
-    <input type="text" id="cInput" list="cList" placeholder="Search country...">
-    <datalist id="cList"></datalist>
+    <input type="text" id="cInput" list="clist" placeholder="Поиск (English)...">
+    <datalist id="clist"></datalist>
 </div>
 
 <div id="map"></div>
 
-<div id="card" class="card">
-    <h2 id="name"></h2>
-    <p id="curr"></p>
-    <div id="rates">Загрузка курсов...</div>
-    <button onclick="this.parentElement.style.display='none'" style="margin-top:10px;">Close</button>
+<div id="card">
+    <h3 id="cName" style="margin-top:0"></h3>
+    <p id="currInfo" style="color:#666"></p>
+    <hr>
+    <div id="rates">Загрузка...</div>
+    <button onclick="this.parentElement.style.display='none'" style="margin-top:15px; width:100%; cursor:pointer;">Закрыть</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     const API_KEY = 'a26755f279-2e3bc8d143-tdy6r0';
-    let countries = [];
+    let countriesData = [];
 
-    // Создаем карту (центр на Узбекистане для тебя)
-    const map = L.map('map').setView([41.3, 69.2], 3);
-    
-    // ПРОВЕРЕНО: Работающая ссылка на карту
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+    const map = L.map('map').setView([41, 69], 3);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Загружаем список стран
     fetch('https://restcountries.com/v3.1/all?fields=name,currencies,cca3,latlng')
         .then(r => r.json())
         .then(data => {
-            countries = data;
-            const list = document.getElementById('cList');
+            countriesData = data;
+            const dl = document.getElementById('clist');
             data.forEach(c => {
                 const o = document.createElement('option');
                 o.value = c.name.common;
-                list.appendChild(o);
+                dl.appendChild(o);
             });
-            drawMap();
+            loadGeo();
         });
 
-    function drawMap() {
+    function loadGeo() {
         fetch('https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson')
             .then(r => r.json())
-            .then(js => {
-                L.geoJSON(js, {
-                    style: { color: '#3498db', weight: 1, fillOpacity: 0.1 },
+            .then(json => {
+                L.geoJSON(json, {
+                    style: { color: '#3498db', weight: 1.5, fillOpacity: 0.1 },
                     onEachFeature: (f, l) => {
-                        l.on('click', () => showInfo(f.properties.iso_a3));
+                        l.on('click', () => update(f.properties.iso_a3));
                     }
                 }).addTo(map);
             });
     }
 
-    async function showInfo(code) {
-        const c = countries.find(x => x.cca3 === code);
-        if (!c || !c.currencies) return;
+    async function update(code) {
+        const c = countriesData.find(x => x.cca3 === code);
+        if(!c || !c.currencies) return;
+        const cur = Object.keys(c.currencies)[0];
         
-        const cc = Object.keys(c.currencies)[0];
-        document.getElementById('name').innerText = c.name.common;
-        document.getElementById('curr').innerText = c.currencies[cc].name;
+        document.getElementById('cName').innerText = c.name.common;
+        document.getElementById('currInfo').innerText = c.currencies[cur].name + " (" + cur + ")";
         document.getElementById('card').style.display = 'block';
 
         try {
-            const res = await fetch(https://api.fastforex.io/fetch-multi?from=USD&to=EUR,RUB,${cc}&api_key=${API_KEY});
-            const d = await res.json();
-            const r = d.results;
+            const r = await fetch(https://api.fastforex.io/fetch-multi?from=USD&to=EUR,RUB,${cur}&api_key=${API_KEY});
+            const d = await r.json();
+            const res = d.results;
             document.getElementById('rates').innerHTML = 
-                1 USD = ${r[cc].toFixed(2)} ${cc}<br>
-                1 EUR = ${(r[cc]/r.EUR).toFixed(2)} ${cc}<br>
-                1 RUB = ${(r[cc]/r.RUB).toFixed(2)} ${cc}
+                <b>1 USD:</b> ${res[cur].toFixed(2)} ${cur}<br>
+                <b>1 EUR:</b> ${(res[cur]/res.EUR).toFixed(2)} ${cur}<br>
+                <b>1 RUB:</b> ${(res[cur]/res.RUB).toFixed(2)} ${cur}
             ;
-        } catch (e) { document.getElementById('rates').innerText = "Ошибка API"; }
+        } catch(e) { document.getElementById('rates').innerText = "Ошибка API"; }
     }
 
     document.getElementById('cInput').addEventListener('change', (e) => {
-        const c = countries.find(x => x.name.common.toLowerCase() === e.target.value.toLowerCase());
-        if(c) { map.flyTo(c.latlng, 4); showInfo(c.cca3); }
+        const c = countriesData.find(x => x.name.common.toLowerCase() === e.target.value.toLowerCase());
+        if(c) { map.flyTo(c.latlng, 4); update(c.cca3); }
     });
 </script>
 </body>
